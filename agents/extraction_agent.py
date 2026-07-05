@@ -15,7 +15,6 @@ from core.pdf_extractor import extract_text_from_pdf, extract_tables_from_pdf
 from core.chunker import chunk_text
 from core.lab_value_parser import parse_lab_values, parse_lab_values_from_tables
 from core.anomaly_detector import flag_all_values, generate_risk_summary
-from core.embeddings import embed_texts, store_chunks, clear_collection
 from data_store.sqlite_store import insert_report, insert_lab_values
 from data_store.models import LabValueRecord, ReportRecord
 
@@ -32,6 +31,7 @@ def ingest_report(
     collection_name: str = "medical_report",
     anonymized_region: str = None,
     age_group: str = None,
+    store_vectors: bool = True,
 ) -> dict:
     """
     Full ingestion pipeline for a medical report PDF.
@@ -43,6 +43,8 @@ def ingest_report(
         collection_name: ChromaDB collection name.
         anonymized_region: Region label (simulated if None).
         age_group: Age group label (simulated if None).
+        store_vectors: Store chunks in vector DB for retrieval. Disable this
+            on low-memory deployments when full report text is passed directly.
 
     Returns:
         Dict with report_id, chunks, flagged_values, risk_summary, raw_text.
@@ -82,7 +84,9 @@ def ingest_report(
     chunks = chunk_text(raw_text)
 
     # 5. Store in vector DB
-    if chunks:
+    if store_vectors and chunks:
+        from core.embeddings import embed_texts, store_chunks
+
         embeddings = embed_texts(chunks)
         metadata_list = [
             {"report_id": report_id, "filename": filename, "region": anonymized_region}
